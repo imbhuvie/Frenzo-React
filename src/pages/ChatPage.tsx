@@ -4,6 +4,7 @@ import {
   Search,
   Settings,
   LogOut,
+  MessageCircle,
   Plus,
   Hash,
   Users,
@@ -15,6 +16,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import ConversationRow from '../components/chat/ConversationRow';
+import MessageComposer from '../components/chat/MessageComposer';
+import NewChatModal from '../components/chat/NewChatModal';
 import { ChatlistEmpty, ChatlistError, ChatlistSkeleton } from '../components/chat/ChatlistStates';
 import { chatApi } from '../api/chat';
 import type { ChatlistItemResponse } from '../types/chat';
@@ -29,6 +32,7 @@ export default function ChatPage() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showNewChat, setShowNewChat] = useState(false);
   // StrictMode mounts twice in dev; skip the second call while one is already flying.
   const chatlistInflight = useRef(false);
 
@@ -67,6 +71,16 @@ export default function ChatPage() {
     [conversations, selectedId],
   );
 
+  const handleChatOpened = (conversationId: string) => {
+    setSelectedId(conversationId);
+  };
+
+  const handleChatStarted = async (conversationId: string) => {
+    setSelectedId(conversationId);
+    await loadChatlist();
+    setSelectedId(conversationId);
+  };
+
   const handleLogout = () => {
     logout();
     toast.success('Signed out successfully');
@@ -92,6 +106,7 @@ export default function ChatPage() {
           <div className="flex items-center justify-between mb-4">
             <Logo size="sm" />
             <button
+              onClick={() => setShowNewChat(true)}
               className="p-2 rounded-xl hover:bg-white/[0.06] text-slate-400 hover:text-white transition-all"
               title="New Conversation"
             >
@@ -216,7 +231,25 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* Welcome state */}
+        {/* Thread view (UI-only: history + send wiring land in later tasks) */}
+        {selectedConversation ? (
+          <>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-sm px-6">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 flex items-center justify-center mb-4">
+                  <MessageCircle size={28} className="text-violet-400" />
+                </div>
+                <p className="text-sm font-medium text-slate-300">No messages yet</p>
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Say hello to {selectedConversation.displayName} — history and sending land in a later task
+                </p>
+              </div>
+            </div>
+            {/* Dead composer: onSend is a no-op until the send-message task wires the API. */}
+            <MessageComposer peerName={selectedConversation.displayName} onSend={() => {}} />
+          </>
+        ) : (
+        /* Welcome state (nothing selected) */
         <div className="flex-1 flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -282,7 +315,14 @@ export default function ChatPage() {
             </div>
           </motion.div>
         </div>
+        )}
       </main>
+      <NewChatModal
+        open={showNewChat}
+        onClose={() => setShowNewChat(false)}
+        onOpened={handleChatOpened}
+        onStarted={(conversationId) => void handleChatStarted(conversationId)}
+      />
     </div>
   );
 }

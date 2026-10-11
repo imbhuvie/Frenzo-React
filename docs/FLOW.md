@@ -80,3 +80,25 @@ timestamps: backend UTC ISO -> device-locale relative labels ("now", "5m", "3h",
 StrictMode note: dev mounts twice; a `chatlistInflight` ref skips the second call
   while one is flying, so the backend log shows one GET per entry (prod: always one).
 ```
+
+## 9. Start-chat picker (`+` icon → `NewChatModal`)
+
+```text
+click + -> modal opens (fresh search, user list loads: GET /api/users?pageSize=20)
+type: debounced 300ms server search (GET /api/users?search=...)
+row Open (hasDirectChat): onOpened(directConversationId) -> select row + close (no write)
+row + Chat: POST /api/conversations/direct { otherUserId } -> spinner on row
+  -> success: onStarted(conversationId) -> reload list -> select row + close
+  -> failure: spinner clears, modal stays (toast via global handler paths)
+close: X, backdrop click, or Esc; 401 anywhere: existing interceptor clears session -> /login
+```
+
+## 10. Thread view (UI-only, no APIs yet)
+
+```text
+no selection: welcome block (unchanged)
+selection: header preview stays -> empty-thread placeholder ("No messages yet")
+  -> MessageComposer pinned at bottom (textbox + gradient Send, Enter to send,
+     Shift+Enter newline, disabled while blank; onSend is a no-op for now)
+history fetch, send POST, and image/audio/video/document options: later tasks
+```

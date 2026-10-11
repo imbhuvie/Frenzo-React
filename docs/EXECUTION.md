@@ -35,6 +35,8 @@ at deploy time (same-origin reverse proxy or `VITE_API_URL`-style env), not hard
 6. After login, `/chat` sidebar fills with live rows (or styled empty state when none);
 type in search to filter; click a row to preview its header; stop the API and reload
 to see the error card, then Retry after restarting.
+7. Click `+` → modal lists users (search narrows server-side); **Open** selects instantly;
+**+ Chat** creates-or-opens and selects the new row (same row on repeat = idempotent backend).
 
 ## Troubleshooting (seen before)
 

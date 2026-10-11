@@ -25,3 +25,18 @@ export interface ChatlistQuery {
   cursor?: string;
   pageSize?: number;
 }
+
+// --- Start-chat picker contracts (match FrenzoAPI GET /api/users, POST /api/conversations/direct) ---
+
+export interface UserListItemResponse {
+  userId: string;
+  username: string;
+  displayName: string;
+  photoUrl: string | null;
+  hasDirectChat: boolean;
+  directConversationId: string | null;
+}
+
+export interface StartDirectRequest {
+  otherUserId: string;
+}

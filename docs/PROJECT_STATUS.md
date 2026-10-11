@@ -40,6 +40,13 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 - Covers skeleton loading, retryable error, empty state, and client-side name search.
 - Clicking a row selects it and previews its header in the main pane (thread lands in a later task).
 
+### Start-chat picker (`+` icon)
+
+- Opens a symmetric modal listing all active users except self (server search, loading/error/empty states).
+- Rows show **Open** (existing 1-1 → selects instantly, no write) or **+ Chat** (creates-or-opens via
+`POST /api/conversations/direct`, then reloads the list and selects the row).
+- Closes on Esc, backdrop click, or success; per-row spinner while starting; 401 handled globally.
+
 ## Current limitations
 
 - Message history, sending, and real-time updates are not implemented or connected to an API (row click previews the header only).
@@ -61,6 +68,9 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 | 2026-10-10 | Homepage chatlist after login: live rows (avatar, snippet, time, unread, mute), skeleton/error/empty states, search filter, select-to-preview header | Complete | `types/chat.ts`, `api/chat.ts`, `components/chat/*`, `ChatPage.tsx`; backend `GET /api/conversations`. |
 | 2026-10-11 | In-flight guard stops the StrictMode double GET per `/chat` entry (backend log showed back-to-back pairs on login/refresh) | Complete | `ChatPage.tsx` `chatlistInflight` ref; single GET per entry, prod unchanged. |
 | 2026-10-11 | Fixed blank login page: `navigate()` ran during render when a valid session existed; moved to `useEffect` (audited `SignupPage` — no such pattern) | Complete | `LoginPage.tsx`; stored session now bounces to `/chat` with no console warning. |
+| 2026-10-11 | Start-chat via `+`: modal lists all active users (search, Open/Start states); Start creates-or-opens a Private 1-1 and selects it | Complete | `types/chat.ts`, `api/chat.ts`, `components/chat/NewChatModal.tsx`, `ChatPage.tsx`; backend `GET /api/users` + `POST /api/conversations/direct`. |
+| 2026-10-11 | Fixed modal double GET (twin immediate+debounced effects) with one dynamic-delay effect + in-flight guard; added `FETCH_RULES.md` (one-effect-per-fetch) so it never recurs | Complete | `NewChatModal.tsx`; reference: `ChatPage.tsx` guard. |
+| 2026-10-11 | Thread view UI-only: selecting a chat replaces welcome with empty-thread placeholder + dead textbox/Send composer (no APIs, no state, no attachments) | Complete | `components/chat/MessageComposer.tsx`, `ChatPage.tsx`; send/history wiring deferred. |
 
 When adding an entry, use the date the change was delivered, describe the user-visible or technical change, and mark it complete only after implementation and verification.
 
