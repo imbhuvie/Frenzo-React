@@ -49,9 +49,9 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 
 ## Current limitations
 
-- Message history, sending, and real-time updates are not implemented or connected to an API (row click previews the header only).
+- Message history, sending, and real-time updates are not implemented or connected to an API (thread shows a placeholder + dead composer).
 - Conversation search filters the loaded page client-side; server paging continues via cursor when more pages land.
-- New conversation, start conversation, create group, and settings controls are presentation-only.
+- Group creation and settings controls are presentation-only (start-chat covers 1-1 only).
 - The forgot-password control is presentation-only.
 - Signup directs the user to sign in; it does not automatically establish a session.
 - Authentication requires the separate FrenzoAPI service. Its implementation and deployment configuration are outside this frontend repository.
