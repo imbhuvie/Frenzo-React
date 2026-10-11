@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
@@ -18,9 +18,14 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ identifier: '', password: '' });
 
-  // Redirect if already logged in
+  // Redirect if already logged in (effect, not render — navigate() during render blanks the page)
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/chat', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
   if (isAuthenticated) {
-    navigate('/chat', { replace: true });
     return null;
   }
 

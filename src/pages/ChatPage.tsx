@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -29,8 +29,12 @@ export default function ChatPage() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // StrictMode mounts twice in dev; skip the second call while one is already flying.
+  const chatlistInflight = useRef(false);
 
   const loadChatlist = useCallback(async () => {
+    if (chatlistInflight.current) return;
+    chatlistInflight.current = true;
     setListLoading(true);
     setListError(false);
     try {
@@ -43,6 +47,7 @@ export default function ChatPage() {
     } catch {
       setListError(true);
     } finally {
+      chatlistInflight.current = false;
       setListLoading(false);
     }
   }, []);

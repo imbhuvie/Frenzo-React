@@ -59,6 +59,8 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 | 2026-10-10 | Axios baseURL made relative (`/api`) so requests flow same-origin through the dev proxy (no CORS/cert issues) | Complete | `src/api/axios.ts`; proxy target is the single backend address. |
 | 2026-10-10 | Proxy repointed to live API port (`https://localhost:7172` + `secure: false`) after empty-500 proved `http://localhost:5143` had no listener | Complete | `vite.config.ts`; dev server restart required (proxy loads at startup). |
 | 2026-10-10 | Homepage chatlist after login: live rows (avatar, snippet, time, unread, mute), skeleton/error/empty states, search filter, select-to-preview header | Complete | `types/chat.ts`, `api/chat.ts`, `components/chat/*`, `ChatPage.tsx`; backend `GET /api/conversations`. |
+| 2026-10-11 | In-flight guard stops the StrictMode double GET per `/chat` entry (backend log showed back-to-back pairs on login/refresh) | Complete | `ChatPage.tsx` `chatlistInflight` ref; single GET per entry, prod unchanged. |
+| 2026-10-11 | Fixed blank login page: `navigate()` ran during render when a valid session existed; moved to `useEffect` (audited `SignupPage` — no such pattern) | Complete | `LoginPage.tsx`; stored session now bounces to `/chat` with no console warning. |
 
 When adding an entry, use the date the change was delivered, describe the user-visible or technical change, and mark it complete only after implementation and verification.
 

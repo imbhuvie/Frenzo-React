@@ -77,4 +77,6 @@ search input: client-side name filter over the loaded page (no refetch)
 row click: selectedId set -> row ring + main-pane header preview
   (name, Group/Direct label, unread line; thread lands in a later task)
 timestamps: backend UTC ISO -> device-locale relative labels ("now", "5m", "3h", "2d")
+StrictMode note: dev mounts twice; a `chatlistInflight` ref skips the second call
+  while one is flying, so the backend log shows one GET per entry (prod: always one).
 ```
