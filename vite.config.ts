@@ -11,6 +11,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // SignalR hub (WebSocket + negotiate) rides the same bridge; ws: true keeps sockets proxied.
+      '/hubs': {
+        target: 'https://localhost:7172',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
 });

@@ -20,11 +20,13 @@ import MessageComposer from '../components/chat/MessageComposer';
 import NewChatModal from '../components/chat/NewChatModal';
 import { ChatlistEmpty, ChatlistError, ChatlistSkeleton } from '../components/chat/ChatlistStates';
 import { chatApi } from '../api/chat';
-import type { ChatlistItemResponse } from '../types/chat';
+import { useChatHub } from '../hooks/useChatHub';
+import type { ChatlistItemResponse, MessageBroadcast } from '../types/chat';
+import { formatRelativeTime } from '../utils/time';
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +35,15 @@ export default function ChatPage() {
   const [listError, setListError] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
+  // Thread map per conversation: history rows merged with live session messages (deduped by id).
+  const [threadMap, setThreadMap] = useState<Record<string, MessageBroadcast[]>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyHasMore, setHistoryHasMore] = useState(true);
+  // One history fetch at a time per FETCH_RULES.md (in-flight guard + cleanup discipline).
+  const historyInflight = useRef(false);
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
+  const threadBottomRef = useRef<HTMLDivElement | null>(null);
   // StrictMode mounts twice in dev; skip the second call while one is already flying.
   const chatlistInflight = useRef(false);
 
@@ -70,6 +81,114 @@ export default function ChatPage() {
     () => conversations.find((item) => item.conversationId === selectedId) ?? null,
     [conversations, selectedId],
   );
+
+  // Appends one broadcast (echo + peer alike), deduped by id; bumps preview/unread/ordering.
+  const appendMessage = useCallback((message: MessageBroadcast) => {
+    const viewingId = selectedIdRef.current;
+    setThreadMap((prev) => {
+      const existing = prev[message.conversationId] ?? [];
+      const isDuplicate = existing.some((item) => item.id === message.id);
+      if (isDuplicate) return prev;
+      return { ...prev, [message.conversationId]: [...existing, message] };
+    });
+    setConversations((prev) =>
+      prev
+        .map((row) => {
+          if (row.conversationId !== message.conversationId) return row;
+          const isViewing = viewingId === message.conversationId;
+          return {
+            ...row,
+            lastMessage: {
+              id: message.id,
+              content: message.content,
+              senderId: message.senderId,
+              messageType: message.messageType,
+              createdAt: message.createdAt,
+            },
+            updatedAt: message.createdAt,
+            unreadCount: isViewing ? 0 : row.unreadCount + 1,
+          };
+        })
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
+    );
+  }, []);
+
+  const getToken = useCallback(() => localStorage.getItem('frenzo_token'), []);
+  const { status: hubStatus, sendMessage } = useChatHub(isAuthenticated, getToken, appendMessage);
+
+  const handleSendMessage = async (text: string): Promise<boolean> => {
+    if (!selectedId) return false;
+    try {
+      const sent = await sendMessage({ conversationId: selectedId, content: text, messageType: 1 });
+      appendMessage(sent);
+      return true;
+    } catch {
+      // Box keeps the text (composer clears only on true); retry by pressing Send again.
+      toast.error('Could not send. Please try again.');
+      return false;
+    }
+  };
+
+  // Keep the thread pinned to the newest message.
+  const threadMessages = useMemo(() => {
+    if (!selectedId) return [];
+    const rows = threadMap[selectedId] ?? [];
+    return [...rows].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  }, [threadMap, selectedId]);
+  useEffect(() => {
+    threadBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [threadMessages.length, selectedId]);
+
+  // Loads one history page (ascending from the API) and merges it with live rows by id.
+  const loadHistory = useCallback(async (conversationId: string, olderCursor?: string) => {
+    if (historyInflight.current) return;
+    historyInflight.current = true;
+    if (!olderCursor) setHistoryLoading(true);
+    try {
+      const result = await chatApi.getHistory(conversationId, olderCursor, 30);
+      if (result.success && result.data) {
+        const page = result.data;
+        setThreadMap((prev) => {
+          const existing = prev[conversationId] ?? [];
+          const knownIds = new Set(existing.map((item) => item.id));
+          const fresh: MessageBroadcast[] = page
+            .filter((item) => !knownIds.has(item.id))
+            .map((item) => ({ ...item, conversationId }));
+          const merged = [...fresh, ...existing];
+          const seen = new Set<string>();
+          const deduped = merged.filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          });
+          return { ...prev, [conversationId]: deduped };
+        });
+        setHistoryHasMore(page.length >= 30);
+      }
+    } catch {
+      // History failure keeps the live thread usable; retry by reselecting the chat.
+    } finally {
+      historyInflight.current = false;
+      if (!olderCursor) setHistoryLoading(false);
+    }
+  }, []);
+
+  // On select: history first, then advance the read marker and zero the badge.
+  useEffect(() => {
+    if (!selectedId) return;
+    setHistoryHasMore(true);
+    void loadHistory(selectedId).then(() => {
+      void chatApi.markRead(selectedId).then((marked) => {
+        if (marked.success) {
+          setConversations((prev) =>
+            prev.map((row) =>
+              row.conversationId === selectedId ? { ...row, unreadCount: 0 } : row,
+            ),
+          );
+        }
+      });
+    });
+  }, [selectedId, loadHistory]);
 
   const handleChatOpened = (conversationId: string) => {
     setSelectedId(conversationId);
@@ -226,27 +345,75 @@ export default function ChatPage() {
               <p className="text-xs text-slate-500">
                 {selectedConversation.isGroup ? 'Group' : 'Direct message'}
                 {selectedConversation.unreadCount > 0 ? ` · ${selectedConversation.unreadCount} unread` : ''}
+                {hubStatus !== 'connected' ? ` · ${hubStatus}…` : ''}
               </p>
             </div>
           </div>
         )}
 
-        {/* Thread view (UI-only: history + send wiring land in later tasks) */}
+        {/* Thread view (history + live session messages, merged by id) */}
         {selectedConversation ? (
           <>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center max-w-sm px-6">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 flex items-center justify-center mb-4">
-                  <MessageCircle size={28} className="text-violet-400" />
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {historyLoading && threadMessages.length === 0 ? (
+                <div className="space-y-2.5 max-w-3xl mx-auto" aria-label="Loading messages">
+                  {[0, 1, 2].map((key) => (
+                    <div key={key} className="h-12 rounded-2xl bg-white/[0.04] animate-pulse" />
+                  ))}
                 </div>
-                <p className="text-sm font-medium text-slate-300">No messages yet</p>
-                <p className="text-xs text-slate-500 mt-1.5">
-                  Say hello to {selectedConversation.displayName} — history and sending land in a later task
-                </p>
-              </div>
+              ) : threadMessages.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center max-w-sm px-6">
+                    <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/20 flex items-center justify-center mb-4">
+                      <MessageCircle size={28} className="text-violet-400" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-300">No messages yet</p>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      Say hello to {selectedConversation.displayName} below
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5 max-w-3xl mx-auto">
+                  {historyHasMore && (
+                    <button
+                      type="button"
+                      onClick={() => void loadHistory(selectedConversation.conversationId, threadMessages[0]?.createdAt)}
+                      className="self-center text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors px-4 py-2"
+                    >
+                      Load older messages
+                    </button>
+                  )}
+                  {threadMessages.map((message) => {
+                    const isOwn = message.senderId === user?.id;
+                    return (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words ${
+                            isOwn
+                              ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-600/20 rounded-br-md'
+                              : 'bg-white/[0.05] border border-white/[0.07] text-slate-200 rounded-bl-md'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                          <p className={`text-[11px] mt-1 text-right ${isOwn ? 'text-white/70' : 'text-slate-500'}`}>
+                            {formatRelativeTime(message.createdAt)}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                  <div ref={threadBottomRef} />
+                </div>
+              )}
             </div>
-            {/* Dead composer: onSend is a no-op until the send-message task wires the API. */}
-            <MessageComposer peerName={selectedConversation.displayName} onSend={() => {}} />
+            <MessageComposer peerName={selectedConversation.displayName} onSend={handleSendMessage} />
           </>
         ) : (
         /* Welcome state (nothing selected) */

@@ -40,3 +40,37 @@ export interface UserListItemResponse {
 export interface StartDirectRequest {
   otherUserId: string;
 }
+
+// --- Realtime contracts (match FrenzoAPI ChatHub + MessageBroadcast) ---
+
+export interface SendMessageRequest {
+  conversationId: string;
+  content: string;
+  messageType?: number;
+}
+
+export interface MessageBroadcast {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  messageType: number;
+  createdAt: string;
+}
+
+export type HubConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+
+// --- History contracts (match FrenzoAPI GET /api/conversations/{id}/messages) ---
+
+export interface MessageItemResponse {
+  id: string;
+  senderId: string;
+  content: string;
+  messageType: number;
+  createdAt: string;
+}
+
+export interface MessageHistoryQuery {
+  cursor?: string;
+  pageSize?: number;
+}

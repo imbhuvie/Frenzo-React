@@ -3,18 +3,23 @@ import { Send } from 'lucide-react';
 
 interface MessageComposerProps {
   peerName: string;
-  // UI-only for now: ChatPage passes a no-op until the send-message task wires the API.
-  onSend: (text: string) => void;
+  // Resolves true when the message was accepted; the box clears only then (failed text stays).
+  onSend: (text: string) => Promise<boolean>;
 }
 
 export default function MessageComposer({ peerName, onSend }: MessageComposerProps) {
   const [text, setText] = useState('');
-  const sendable = text.trim().length > 0;
+  const [sending, setSending] = useState(false);
+  const sendable = text.trim().length > 0 && !sending;
 
   const handleSend = () => {
     if (!sendable) return;
-    onSend(text.trim());
-    setText('');
+    const outgoing = text.trim();
+    setSending(true);
+    void onSend(outgoing).then((accepted) => {
+      setSending(false);
+      if (accepted) setText('');
+    });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {

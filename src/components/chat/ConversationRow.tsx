@@ -1,20 +1,7 @@
 import { motion } from 'framer-motion';
 import { VolumeX, Users } from 'lucide-react';
 import type { ChatlistItemResponse } from '../../types/chat';
-
-function formatRelativeTime(isoUtc: string): string {
-  const then = new Date(isoUtc).getTime();
-  const diffMs = Date.now() - then;
-  if (Number.isNaN(then) || diffMs < 0) return '';
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return 'now';
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(then).toLocaleDateString();
-}
+import { formatRelativeTime } from '../../utils/time';
 
 function formatUnread(count: number): string {
   return count > 99 ? '99+' : `${count}`;

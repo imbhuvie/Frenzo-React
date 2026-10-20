@@ -49,7 +49,7 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 
 ## Current limitations
 
-- Message history, sending, and real-time updates are not implemented or connected to an API (thread shows a placeholder + dead composer).
+- Real-time updates flow through the hub; message history now loads (latest 30 + older), sending is live.
 - Conversation search filters the loaded page client-side; server paging continues via cursor when more pages land.
 - Group creation and settings controls are presentation-only (start-chat covers 1-1 only).
 - The forgot-password control is presentation-only.
@@ -71,12 +71,14 @@ snippet, relative time, violet unread pill (`99+` cap), mute icon, group badge, 
 | 2026-10-11 | Start-chat via `+`: modal lists all active users (search, Open/Start states); Start creates-or-opens a Private 1-1 and selects it | Complete | `types/chat.ts`, `api/chat.ts`, `components/chat/NewChatModal.tsx`, `ChatPage.tsx`; backend `GET /api/users` + `POST /api/conversations/direct`. |
 | 2026-10-11 | Fixed modal double GET (twin immediate+debounced effects) with one dynamic-delay effect + in-flight guard; added `FETCH_RULES.md` (one-effect-per-fetch) so it never recurs | Complete | `NewChatModal.tsx`; reference: `ChatPage.tsx` guard. |
 | 2026-10-11 | Thread view UI-only: selecting a chat replaces welcome with empty-thread placeholder + dead textbox/Send composer (no APIs, no state, no attachments) | Complete | `components/chat/MessageComposer.tsx`, `ChatPage.tsx`; send/history wiring deferred. |
+| 2026-10-11 | Thread history + read receipts: open loads latest 30 (Load older via cursor), merged with live rows, badge zeroes via `POST read` | Complete | `types/chat.ts`, `api/chat.ts`, `ChatPage.tsx`; backend history + read endpoints. |
+| 2026-10-11 | Live send + receive via SignalR: hub connects on `/chat`, composer sends through it, bubbles render instantly, failures keep text + toast | Complete | `@microsoft/signalr`, `api/signalr.ts`, `hooks/useChatHub.ts`, `types/chat.ts`, `ChatPage.tsx`, `vite.config.ts` `/hubs` proxy; history still deferred. |
 
 When adding an entry, use the date the change was delivered, describe the user-visible or technical change, and mark it complete only after implementation and verification.
 
 ## Planned work
 
-- Implement message history and message sending for the selected conversation, then support real-time updates if provided by the backend.
+- Implement real-time updates if provided by the backend (hub wiring on top of the live thread).
 - Implement conversation search and account settings.
 - Add forgot-password and password-reset flows if supported by the API.
 - Add automated tests and linting scripts as the feature surface grows.

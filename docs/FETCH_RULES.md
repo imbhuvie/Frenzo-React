@@ -3,6 +3,8 @@
 One effect owns each fetch. Two effects fetching the same data (e.g. an immediate load plus a
 debounced twin) double every open — this exact bug shipped once in `NewChatModal` and was fixed
 2026-10-11. Follow this shape for every new list fetch (message history, global search, ...).
+Persistent connections (`useChatHub`) are exempt — they are not fetches — but keep the same
+cleanup discipline (disconnect on unmount, latest-handler refs).
 
 ## The pattern
 

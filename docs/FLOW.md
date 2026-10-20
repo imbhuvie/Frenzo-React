@@ -93,12 +93,26 @@ row + Chat: POST /api/conversations/direct { otherUserId } -> spinner on row
 close: X, backdrop click, or Esc; 401 anywhere: existing interceptor clears session -> /login
 ```
 
-## 10. Thread view (UI-only, no APIs yet)
+## 10. Thread view (history + live, merged by id)
 
 ```text
-no selection: welcome block (unchanged)
-selection: header preview stays -> empty-thread placeholder ("No messages yet")
-  -> MessageComposer pinned at bottom (textbox + gradient Send, Enter to send,
-     Shift+Enter newline, disabled while blank; onSend is a no-op for now)
-history fetch, send POST, and image/audio/video/document options: later tasks
+select chat: history effect loads latest 30 (ascending, skeleton row while loading)
+  -> merge with live session rows by id -> render oldest-to-newest
+  -> markRead fires -> row badge zeroes
+Load older messages: cursor = oldest createdAt -> prepend (fewer than 30 means done)
+live ReceiveMessage / echo: append + dedupe -> preview/unread bump + re-sort + autoscroll
+empty thread (no history, no session): placeholder + composer (Send enabled, dead until §11)
+```
+
+## 11. Realtime send + receive (SignalR, hub-live only)
+
+```text
+enter /chat authed -> useChatHub connects to /hubs/chat (token factory, auto-reconnect)
+  -> join happens server-side per active membership; header shows status unless connected
+send: composer -> hub SendMessage { conversationId, content, type 1 }
+  -> echo appends instantly (deduped by id against the broadcast)
+receive: ReceiveMessage -> append to that thread -> row preview/unread bump + re-sort;
+  open thread zeroes its unread; box clears only on success, failure toasts and keeps text
+disconnect: unmount/logout stops; reconnect resumes automatically
+history: still deferred — threads hold this session's messages only
 ```
